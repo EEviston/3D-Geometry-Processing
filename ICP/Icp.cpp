@@ -150,66 +150,6 @@ std::tuple<Eigen::Matrix3d, Eigen::Vector3d> Icp::point_to_point_subsample(Eigen
 
 }
 
-std::tuple<Eigen::Matrix3d, Eigen::Vector3d> Icp::point_to_point_multiple(Eigen::MatrixXd V0, Eigen::MatrixXd V1)
-{
-	Eigen::Matrix<double, Dynamic, Dynamic>  mat(V0.rows(), 3);
-	for (size_t i = 0; i < V0.rows(); i++)
-		for (size_t d = 0; d < 3; d++)
-			mat(i, d) = V0(i, d);
-
-	typedef KDTreeEigenMatrixAdaptor< Eigen::Matrix<double, Dynamic, Dynamic> >  my_kd_tree_t;
-	my_kd_tree_t   mat_index(mat, 10);
-	mat_index.index->buildIndex();
-
-	Vector3d p_bar, q_bar;
-	p_bar = (1.0 / V1.rows()) * V0.colwise().sum();
-	q_bar = (1.0 / V1.rows()) * V1.colwise().sum();
-	Eigen::MatrixXd A = MatrixXd::Zero(3, 3);
-	Nv = Eigen::MatrixXd::Zero(V0.rows(), V0.cols());
-	ps = Eigen::MatrixXd::Zero(Nv.rows(), 3);
-	qs = Eigen::MatrixXd::Zero(Nv.rows(), 3);
-
-	for (int idx = 0; idx < V1.rows(); idx++) {
-		std::vector<double> query_pt(3);
-		for (size_t d = 0; d < 3; d++)
-			query_pt[d] = V1(idx, d);
-
-		const size_t num_results = 3;
-		vector<size_t>   ret_indexes(num_results);
-		vector<double> out_dists_sqr(num_results);
-		nanoflann::KNNResultSet<double> resultSet(num_results);
-		resultSet.init(&ret_indexes[0], &out_dists_sqr[0]);
-		mat_index.index->findNeighbors(resultSet, &query_pt[0], nanoflann::SearchParams(10));
-
-		double p0 = V0(ret_indexes[0], 0);
-		double p1 = V0(ret_indexes[0], 1);
-		double p2 = V0(ret_indexes[0], 2);
-
-		double q0 = V1(idx, 0);
-		double q1 = V1(idx, 1);
-		double q2 = V1(idx, 2);
-
-		MatrixXd pi(1, 3);
-		MatrixXd qi(1, 3);
-
-		pi(0, 0) = p0 - p_bar(0);
-		pi(0, 1) = p1 - p_bar(1);
-		pi(0, 2) = p2 - p_bar(2);
-		qi(0, 0) = q0 - q_bar(0);
-		qi(0, 1) = q1 - q_bar(1);
-		qi(0, 2) = q2 - q_bar(2);
-
-		A += pi.transpose() * qi;
-	}
-	cout << A << endl;
-
-	JacobiSVD<MatrixXd> svd(A, ComputeThinU | ComputeThinV);
-	Matrix3d R = (svd.matrixV()*(svd.matrixU().transpose()));
-	Vector3d t = p_bar - (R * q_bar);
-
-	return std::make_tuple(R, t);
-}
-
 std::tuple<Eigen::Matrix3d, Eigen::Vector3d> Icp::point_to_plane(Eigen::MatrixXd V0, Eigen::MatrixXd V1)
 {
 	typedef KDTreeEigenMatrixAdaptor< Eigen::Matrix<double, Dynamic, Dynamic> >  my_kd_tree_t;
